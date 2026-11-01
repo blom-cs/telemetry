@@ -1,0 +1,31 @@
+# Idiomatic Rust formatting for `cargo fmt`.
+# Style is the 2024 Rust Style Guide, plus field-init and `?` shorthand.
+# Unstable rustfmt options are omitted so `cargo fmt` works on stable.
+
+edition = "2024"
+style_edition = "2024"
+
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Unix"
+
+use_small_heuristics = "Default"
+use_field_init_shorthand = true
+use_try_shorthand = true
+merge_derives = true
+remove_nested_parens = true
+reorder_imports = true
+reorder_modules = true
+match_block_trailing_comma = false
+force_explicit_abi = true
+
+# Trailing return: one blank line before the last `return` or tail
+# expression of a `fn` body when other statements precede it. rustfmt
+# does not insert this line; it keeps one that is already there.
+#
+#     fn prepare() -> Result<Handle, Error> {
+#         let handle = open()?;
+#
+#         Ok(handle)
+#     }
