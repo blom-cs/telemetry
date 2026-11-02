@@ -121,14 +121,15 @@ Coverage is measured with `cargo-llvm-cov` on nightly, because the tool needs th
 
 ```bash
 cargo +nightly llvm-cov --all-features --workspace --branch \
-  --fail-under-lines 100 --fail-under-functions 100 --summary-only
+  --fail-under-lines 100 --fail-under-functions 100 \
+  --json --summary-only --output-path target/llvm-cov-summary.json
 ```
 
 The policy encoded by that job:
 
 - Line coverage is 100 percent. `cargo-llvm-cov` fails the command when the figure is lower.
 - Function coverage is 100 percent, enforced the same way.
-- Branch coverage is collected with `--branch`. The job reads the `TOTAL` branch percentage from the summary and treats a figure below 80 percent as a failure.
+- Branch coverage is collected with `--branch`. The job reads `totals.branches` from the JSON summary and fails when there are no branches, or when covered branches are below 80 percent. The comparison is `covered * 100 < 80 * count`, so 80 percent passes.
 
 Install the tools the workflow uses when you want the same command locally: a nightly toolchain with `llvm-tools-preview`, and `cargo-llvm-cov`.
 

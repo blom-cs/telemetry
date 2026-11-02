@@ -70,13 +70,51 @@ jobs:
       - name: coverage check
         run: |
           set -euo pipefail
-          report=$(cargo +nightly llvm-cov --all-features --workspace --branch --fail-under-lines 100 --fail-under-functions 100 --summary-only)
-          printf '%s\n' "$report"
-          branch=$(printf '%s\n' "$report" | awk '/^TOTAL/ { print $NF }')
-          if [ "$branch" < "80.00%" ]; then
-          echo "branch coverage ${branch} is below 80%" >&2
-          exit 1
-          fi
+          report=target/llvm-cov-summary.json
+          mkdir -p target
+          # Line and function floors are enforced by cargo-llvm-cov.
+          # Branch coverage has no matching flag. The JSON summary is
+          # compared numerically: a text-report string compare treats
+          # 100.00% as less than 80.00%, and "<" inside [ ] is a redirect.
+          cargo +nightly llvm-cov \
+            --all-features \
+            --workspace \
+            --branch \
+            --fail-under-lines 100 \
+            --fail-under-functions 100 \
+            --json \
+            --summary-only \
+            --output-path "$report"
+          python3 - "$report" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              payload = json.load(handle)
+
+          def totals(kind):
+              count = 0
+              covered = 0
+              for entry in payload["data"]:
+                  item = entry["totals"][kind]
+                  count += int(item["count"])
+                  covered += int(item["covered"])
+              return count, covered
+
+          for kind in ("lines", "functions", "regions", "branches"):
+              count, covered = totals(kind)
+              percent = 0.0 if count == 0 else covered * 100.0 / count
+              print(f"{kind}: {percent:.2f}% ({covered}/{count})")
+
+          count, covered = totals("branches")
+          if count == 0 or covered * 100 < 80 * count:
+              percent = 0.0 if count == 0 else covered * 100.0 / count
+              print(
+                  f"branch coverage {percent:.2f}% is below 80%",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          PY
 
   security:
     name: Security
