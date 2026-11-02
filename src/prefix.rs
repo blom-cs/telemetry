@@ -95,6 +95,8 @@ mod tests {
      * @test-list
      * 1. Event lines include the prefix argument.
      * 2. Event timestamps keep two fractional digits.
+     * 3. Capture writer flush succeeds.
+     * 4. Capture writer write fails when the lock is poisoned.
      */
 
     #[derive(Clone)]
@@ -169,5 +171,28 @@ mod tests {
                 .is_some_and(|(_, frac)| frac.len() == 2),
             "expected two fractional digits in {stamp:?} from {text:?}"
         );
+    }
+
+    #[test]
+    fn capture_writer_flush_is_ok() {
+        let buf: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::new()));
+        let mut writer = CaptureWriter { buf };
+        let result = writer.flush();
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn capture_writer_write_fails_when_lock_is_poisoned() {
+        let buf: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::new()));
+        let poison = Arc::clone(&buf);
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = poison.lock().expect("lock");
+            panic!("poison capture lock");
+        }));
+        let mut writer = CaptureWriter { buf };
+        let result = writer.write(b"x");
+
+        assert!(result.is_err());
     }
 }

@@ -153,7 +153,7 @@ cargo deny check
 cargo audit
 ```
 
-Continuous integration runs build, format, clippy, coverage, and the same security checks. Line and function coverage are required at 100 percent. The coverage job also collects branch coverage. The testing notes describe each unit test, the coverage command, and the workflow files.
+Continuous integration runs build, format, clippy, coverage, and the same security checks. The coverage job combines line, function, region, and branch counts into one workspace total and fails when that total is below 80 percent. The testing notes describe each unit test, the coverage command, and the workflow files.
 
 ## License
 

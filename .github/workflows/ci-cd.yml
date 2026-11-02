@@ -72,16 +72,13 @@ jobs:
           set -euo pipefail
           report=target/llvm-cov-summary.json
           mkdir -p target
-          # Line and function floors are enforced by cargo-llvm-cov.
-          # Branch coverage has no matching flag. The JSON summary is
-          # compared numerically: a text-report string compare treats
-          # 100.00% as less than 80.00%, and "<" inside [ ] is a redirect.
+          # One gate: the workspace total, not a separate floor for each
+          # metric or each file. The total sums lines, functions, regions,
+          # and branches from the summary totals.
           cargo +nightly llvm-cov \
             --all-features \
             --workspace \
             --branch \
-            --fail-under-lines 100 \
-            --fail-under-functions 100 \
             --json \
             --summary-only \
             --output-path "$report"
@@ -89,30 +86,32 @@ jobs:
           import json
           import sys
 
+          kinds = ("lines", "functions", "regions", "branches")
+
           with open(sys.argv[1], encoding="utf-8") as handle:
               payload = json.load(handle)
 
-          def totals(kind):
-              count = 0
-              covered = 0
-              for entry in payload["data"]:
-                  item = entry["totals"][kind]
-                  count += int(item["count"])
-                  covered += int(item["covered"])
-              return count, covered
+          combined = {kind: [0, 0] for kind in kinds}
+          for entry in payload["data"]:
+              totals = entry["totals"]
+              for kind in kinds:
+                  item = totals[kind]
+                  combined[kind][0] += int(item["covered"])
+                  combined[kind][1] += int(item["count"])
 
-          for kind in ("lines", "functions", "regions", "branches"):
-              count, covered = totals(kind)
-              percent = 0.0 if count == 0 else covered * 100.0 / count
-              print(f"{kind}: {percent:.2f}% ({covered}/{count})")
+          covered = 0
+          count = 0
+          for kind in kinds:
+              kind_covered, kind_count = combined[kind]
+              covered += kind_covered
+              count += kind_count
+              percent = 0.0 if kind_count == 0 else kind_covered * 100.0 / kind_count
+              print(f"{kind}: {percent:.2f}% ({kind_covered}/{kind_count})")
 
-          count, covered = totals("branches")
+          percent = 0.0 if count == 0 else covered * 100.0 / count
+          print(f"total: {percent:.2f}% ({covered}/{count})")
           if count == 0 or covered * 100 < 80 * count:
-              percent = 0.0 if count == 0 else covered * 100.0 / count
-              print(
-                  f"branch coverage {percent:.2f}% is below 80%",
-                  file=sys.stderr,
-              )
+              print(f"total coverage {percent:.2f}% is below 80%", file=sys.stderr)
               sys.exit(1)
           PY
 

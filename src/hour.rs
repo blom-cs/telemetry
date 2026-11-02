@@ -151,7 +151,24 @@ impl UtcStamp {
     pub(crate) fn trim(now: OffsetDateTime) -> OffsetDateTime {
         let ns = now.nanosecond();
         let trimmed = ns / SUBSEC_TICK_NS * SUBSEC_TICK_NS;
-        match now.replace_nanosecond(trimmed) {
+
+        Self::with_nanosecond(now, trimmed)
+    }
+
+    /// @details
+    /// Apply `nanosecond`, or keep `now` when the value is out of range.
+    ///
+    /// @responsibilities
+    /// - Apply a nanosecond value, or keep the original time.
+    ///
+    /// @behaviour
+    /// Completes without I/O unless callers have already opened a backend.
+    ///
+    /// @return
+    /// Returns `OffsetDateTime`. This method does not fail. A replace failure leaves `now`
+    /// unchanged.
+    fn with_nanosecond(now: OffsetDateTime, nanosecond: u32) -> OffsetDateTime {
+        match now.replace_nanosecond(nanosecond) {
             Ok(time) => time,
             Err(_) => now,
         }
@@ -214,7 +231,8 @@ mod tests {
      * 2. now_utc is at least as long as a one-digit hour key.
      * 3. file_name puts prefix first and ends in .log.
      * 4. trim keeps two subsecond digits.
-     * 5. write_to prints RFC3339 with two fractional digits and a trailing space.
+     * 5. with_nanosecond keeps the original time when replace fails.
+     * 6. write_to prints RFC3339 with two fractional digits and a trailing space.
      */
 
     /// @details
@@ -263,6 +281,14 @@ mod tests {
         let trimmed = UtcStamp::trim(epoch_with_nanos(123_456_789));
 
         assert_eq!(trimmed.nanosecond(), 120_000_000);
+    }
+
+    #[test]
+    fn with_nanosecond_keeps_original_when_replace_fails() {
+        let epoch = epoch_with_nanos(0);
+        let result = UtcStamp::with_nanosecond(epoch, u32::MAX);
+
+        assert_eq!(result, epoch);
     }
 
     #[test]
